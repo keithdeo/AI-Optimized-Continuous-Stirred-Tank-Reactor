@@ -98,17 +98,5 @@ The model:
 4. Calculates conversion from A to B
 5. Returns reactor performance data
 
-Example:
-
-```python
-temperature = 500
-concentration = 2
-time = 10
-
-results = calculations(
-    temperature,
-    concentration,
-    time
-)
 
 print(results)
