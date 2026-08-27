@@ -10,21 +10,9 @@ FEATURE_COLUMNS = [
     "Time (s)"
 ]
 
-
-# -----------------------------------
-# 1. Load the trained AI model
-# -----------------------------------
-
 model = joblib.load("reactor_model.pkl")
 
 data = pd.read_csv("reaction_data.csv")
-
-print("AI model loaded successfully!")
-
-
-# -----------------------------------
-# 2. Command-line arguments
-# -----------------------------------
 
 def parse_args():
 
@@ -49,7 +37,6 @@ def parse_args():
     parser.add_argument("--energy-price", type=float)
     parser.add_argument("--product-value", type=float)
 
-    # Search step sizes
     parser.add_argument(
         "--temperature-step",
         type=float,
@@ -70,23 +57,12 @@ def parse_args():
 
     return parser.parse_args()
 
-
-# -----------------------------------
-# 3. Check whether interactive input
-# is available
-# -----------------------------------
-
 def is_interactive():
 
     return (
         sys.stdin is not None
         and sys.stdin.isatty()
     )
-
-
-# -----------------------------------
-# 4. Get numerical input
-# -----------------------------------
 
 def get_float_input(prompt):
 
@@ -120,12 +96,6 @@ def get_float_input(prompt):
 
             sys.exit(1)
 
-
-# -----------------------------------
-# 5. Use command-line value if given,
-# otherwise ask the user
-# -----------------------------------
-
 def get_value(arg_value, prompt):
 
     if arg_value is not None:
@@ -134,27 +104,11 @@ def get_value(arg_value, prompt):
 
     return get_float_input(prompt)
 
-
-# -----------------------------------
-# 6. Parse arguments
-# -----------------------------------
-
 args = parse_args()
 
+print("AI REACTOR OPTIMIZATION")
 
-print("\n======================================")
-print("       AI REACTOR OPTIMIZATION")
-print("======================================")
-
-
-# -----------------------------------
-# 7. Get reactor operating ranges
-# -----------------------------------
-
-print(
-    "\nEnter the operating range "
-    "for the optimizer."
-)
+print("\nEnter the operating range "for the optimizer.")
 
 
 min_temperature = get_value(
@@ -192,54 +146,34 @@ max_time = get_value(
     "Maximum residence time (min): "
 )
 
-
-# -----------------------------------
-# 8. Get heating parameters
-# -----------------------------------
-
 print("\nEnter heating parameters.")
-
 
 mass = get_value(
     args.mass,
     "Mass of material (kg): "
 )
 
-
 cp = get_value(
     args.cp,
     "Specific heat capacity Cp (kJ/(kg*K)): "
 )
-
 
 feed_temperature = get_value(
     args.feed_temperature,
     "Feed temperature (K): "
 )
 
-
-# -----------------------------------
-# 9. Get economic parameters
-# -----------------------------------
-
 print("\nEnter economic parameters.")
-
 
 energy_price = get_value(
     args.energy_price,
     "Energy price ($/kWh): "
 )
 
-
 product_value = get_value(
     args.product_value,
     "Product value at 100% conversion ($): "
 )
-
-
-# -----------------------------------
-# 10. Get training-data ranges
-# -----------------------------------
 
 min_trained_temperature = (
     data["Temperature (K)"].min()
@@ -249,7 +183,6 @@ max_trained_temperature = (
     data["Temperature (K)"].max()
 )
 
-
 min_trained_concentration = (
     data["Concentration (M)"].min()
 )
@@ -257,7 +190,6 @@ min_trained_concentration = (
 max_trained_concentration = (
     data["Concentration (M)"].max()
 )
-
 
 min_trained_time_seconds = (
     data["Time (s)"].min()
@@ -267,10 +199,6 @@ max_trained_time_seconds = (
     data["Time (s)"].max()
 )
 
-
-# Convert training time to minutes
-# because user inputs time in minutes
-
 min_trained_time = (
     min_trained_time_seconds / 60
 )
@@ -278,11 +206,6 @@ min_trained_time = (
 max_trained_time = (
     max_trained_time_seconds / 60
 )
-
-
-# -----------------------------------
-# 11. Validate user ranges
-# -----------------------------------
 
 if min_temperature > max_temperature:
 
@@ -343,10 +266,6 @@ if args.time_step <= 0:
 
     sys.exit(1)
 
-
-# -----------------------------------
-# 12. Validate training ranges
-# -----------------------------------
 
 if min_temperature < min_trained_temperature:
 
@@ -438,10 +357,6 @@ if max_time > max_trained_time:
     sys.exit(1)
 
 
-# -----------------------------------
-# 13. Heating energy function
-# -----------------------------------
-
 def heating_energy(
     mass,
     cp,
@@ -459,11 +374,6 @@ def heating_energy(
     )
 
     return energy
-
-
-# -----------------------------------
-# 14. Create search ranges
-# -----------------------------------
 
 temperature_step = (
     args.temperature_step
@@ -522,11 +432,6 @@ while time <= max_time:
 
     time += time_step
 
-
-# -----------------------------------
-# 15. Make sure ranges aren't empty
-# -----------------------------------
-
 if (
     len(temperature_range) == 0
     or len(concentration_range) == 0
@@ -539,11 +444,6 @@ if (
     )
 
     sys.exit(1)
-
-
-# -----------------------------------
-# 16. Set up optimization
-# -----------------------------------
 
 best_score = float("-inf")
 
@@ -558,10 +458,6 @@ best_energy_cost = 0
 best_conversion_value = 0
 
 
-# -----------------------------------
-# 17. Search reactor conditions
-# -----------------------------------
-
 print(
     "\nSearching reactor conditions..."
 )
@@ -573,18 +469,7 @@ for temperature in temperature_range:
 
         for time in time_range:
 
-            # -----------------------------------
-            # Convert user time from minutes
-            # to seconds because the AI expects
-            # Time (s)
-            # -----------------------------------
-
             time_seconds = time * 60
-
-
-            # -----------------------------------
-            # Ask AI for predicted conversion
-            # -----------------------------------
 
             prediction = model.predict(
 
@@ -603,10 +488,6 @@ for temperature in temperature_range:
             )[0]
 
 
-            # -----------------------------------
-            # Calculate heating energy
-            # -----------------------------------
-
             energy = heating_energy(
 
                 mass,
@@ -615,19 +496,10 @@ for temperature in temperature_range:
                 temperature
             )
 
-
-            # -----------------------------------
-            # Convert kJ to kWh
-            # -----------------------------------
-
             energy_kwh = (
                 energy / 3600
             )
 
-
-            # -----------------------------------
-            # Calculate heating cost
-            # -----------------------------------
 
             heating_cost = (
                 energy_kwh
@@ -635,19 +507,11 @@ for temperature in temperature_range:
             )
 
 
-            # -----------------------------------
-            # Calculate value of converted product
-            # -----------------------------------
 
             conversion_value = (
                 prediction
                 * product_value
             )
-
-
-            # -----------------------------------
-            # Calculate economic score
-            # -----------------------------------
 
             score = (
                 conversion_value
@@ -655,9 +519,6 @@ for temperature in temperature_range:
             )
 
 
-            # -----------------------------------
-            # Check if this is the best result
-            # -----------------------------------
 
             if score > best_score:
 
@@ -682,9 +543,6 @@ for temperature in temperature_range:
                 )
 
 
-# -----------------------------------
-# 18. Check optimization result
-# -----------------------------------
 
 if best_conditions is None:
 
@@ -696,27 +554,11 @@ if best_conditions is None:
     sys.exit(1)
 
 
-# -----------------------------------
-# 19. Get optimal conditions
-# -----------------------------------
-
 temperature, concentration, time = (
     best_conditions
 )
 
-
-# -----------------------------------
-# 20. Display results
-# -----------------------------------
-
-print("\n======================================")
-print("          OPTIMIZATION RESULTS")
-print("======================================")
-
-
-print("\nOptimal Conditions")
-print("--------------------------------------")
-
+print("OPTIMIZATION RESULTS")
 
 print(
     f"Temperature: "
@@ -741,15 +583,6 @@ print(
     f"{best_conversion * 100:.2f}%"
 )
 
-
-# -----------------------------------
-# Energy results
-# -----------------------------------
-
-print("\nHeating Requirements")
-print("--------------------------------------")
-
-
 print(
     f"Feed Temperature: "
     f"{feed_temperature:.2f} K"
@@ -767,13 +600,7 @@ print(
     f"{best_energy / 3600:.4f} kWh"
 )
 
-
-# -----------------------------------
-# Economic results
-# -----------------------------------
-
 print("\nEconomic Results")
-print("--------------------------------------")
 
 
 print(
@@ -792,6 +619,3 @@ print(
     f"Economic Score: "
     f"${best_score:.2f}"
 )
-
-
-print("\n======================================")
