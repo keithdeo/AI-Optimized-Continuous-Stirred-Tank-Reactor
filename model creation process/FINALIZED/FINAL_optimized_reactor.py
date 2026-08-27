@@ -63,9 +63,7 @@ def get_float_input(prompt):
             sys.exit(1)
 
 def get_value(prompt):
-
-    prompt_with_default = f"{prompt} [{default}] "
-    return get_float_input(prompt_with_default, default)
+    return prompt;
 
 print("\nEnter CURRENT reactor conditions.")
 print("These are the unoptimized conditions.")
@@ -87,85 +85,23 @@ current_time = get_value(
     round(mean_trained_time, 2)
 )
 
-# -----------------------------------
-# 8. Get optimization ranges
-# -----------------------------------
 print("\nEnter the operating range")
 print("for the optimizer.")
-
-
 min_temperature = get_value("Minimum temperature (K): ", round(min_trained_temperature, 2))
-
-
 max_temperature = get_value("Maximum temperature (K): ", round(max_trained_temperature, 2))
-
-
 min_concentration = get_value("Minimum concentration (M): ", round(min_trained_concentration, 3))
-
-
 max_concentration = get_value("Maximum concentration (M): ", round(max_trained_concentration, 3))
-
-
 min_time = get_value("Minimum residence time (s): ", round(min_trained_time, 2))
-
-
 max_time = get_value("Maximum residence time (s): ", round(max_trained_time, 2))
 
-# -----------------------------------
-# 9. Heating parameters
-# -----------------------------------
 print("\nEnter heating parameters.")
-
 mass = get_value("Mass of material (kg): ", 1.0)
-
 cp = get_value("Specific heat capacity Cp (kJ/(kg*K)): ", 4.18)
-
 feed_temperature = get_value("Feed temperature (K): ", 298.15)
 
-# -----------------------------------
-# 10. Economic parameters
-# -----------------------------------
 print("\nEnter economic parameters.")
-
 energy_price = get_value("Energy price ($/kWh): ", 0.1)
-
 product_value = get_value("Product value at 100% conversion ($): ", 100.0)
-
-# -----------------------------------
-# 11. Training-data ranges
-# -----------------------------------
-
-min_trained_temperature = (
-    data["Temperature (K)"].min()
-)
-
-max_trained_temperature = (
-    data["Temperature (K)"].max()
-)
-
-min_trained_concentration = (
-    data["Concentration (M)"].min()
-)
-
-max_trained_concentration = (
-    data["Concentration (M)"].max()
-)
-
-min_trained_time_seconds = (
-    data["Time (s)"].min()
-)
-
-max_trained_time_seconds = (
-    data["Time (s)"].max()
-)
-
-# Training times are in seconds; keep seconds for comparisons
-min_trained_time = min_trained_time_seconds
-max_trained_time = max_trained_time_seconds
-
-# -----------------------------------
-# 12. Validate optimization ranges
-# -----------------------------------
 
 if min_temperature > max_temperature:
 
@@ -250,10 +186,6 @@ if max_time > 60:
 
     sys.exit(1)
 
-# -----------------------------------
-# 13. Validate against AI training range
-# -----------------------------------
-
 if min_temperature < min_trained_temperature:
 
     print("\nError: minimum temperature is outside training range.")
@@ -295,16 +227,9 @@ if max_time > max_trained_time:
 
     sys.exit(1)
 
-# -----------------------------------
-# 14. Heating energy function
-# -----------------------------------
-
 def heating_energy(mass,cp,feed_temperature,reactor_temperature):
     return (mass * cp * (reactor_temperature - feed_temperature))
 
-# -----------------------------------
-# 15. Calculate CURRENT reactor performance
-# -----------------------------------
 
 current_time_seconds = current_time
 
