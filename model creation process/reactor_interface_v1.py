@@ -5,15 +5,9 @@ import pandas as pd
 
 FEATURE_COLUMNS = ["Temperature (K)", "Concentration (M)", "Time (s)"]
 
-
-# -----------------------------------
-# 1. Load the trained AI model
-# -----------------------------------
-
 model = joblib.load("reactor_model.pkl")
 
 print("AI model loaded successfully!")
-
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -60,15 +54,10 @@ def get_value(arg_value, prompt):
         return arg_value
     return get_float_input(prompt)
 
-
 args = parse_args()
 
-print("\n======================================")
-print("       AI REACTOR OPTIMIZATION")
-print("======================================")
-
+print("AI REACTOR OPTIMIZATION")
 print("\nEnter the operating range for the optimizer.")
-
 
 # Temperature range
 min_temperature = get_value(
@@ -105,11 +94,6 @@ max_time = get_value(
     "Maximum residence time (min): "
 )
 
-
-# -----------------------------------
-# 3. Get heating parameters
-# -----------------------------------
-
 print("\nEnter heating parameters.")
 
 mass = get_value(
@@ -144,11 +128,6 @@ if args.temperature_step <= 0 or args.concentration_step <= 0 or args.time_step 
     print("\nError: step sizes must be positive numbers.")
     sys.exit(1)
 
-
-# -----------------------------------
-# 4. Heating energy function
-# -----------------------------------
-
 def heating_energy(
     mass,
     cp,
@@ -162,19 +141,10 @@ def heating_energy(
 
     return energy
 
-
-# -----------------------------------
-# 5. Set up optimization
-# -----------------------------------
-
 best_conversion = 0
 
 best_conditions = None
 
-
-# -----------------------------------
-# 6. Create search ranges
-# -----------------------------------
 
 temperature_step = int(args.temperature_step)
 
@@ -212,11 +182,6 @@ if len(temperature_range) == 0 or len(concentration_range) == 0 or len(time_rang
     print("\nError: one or more search ranges are empty. Check your min/max values and step sizes.")
     sys.exit(1)
 
-
-# -----------------------------------
-# 7. Search reactor conditions
-# -----------------------------------
-
 print("\nSearching reactor conditions...")
 
 for temperature in temperature_range:
@@ -249,17 +214,7 @@ if best_conditions is None:
     print("\nError: no valid reactor conditions were found. Check your input values and search steps.")
     sys.exit(1)
 
-
-# -----------------------------------
-# 8. Get optimal conditions
-# -----------------------------------
-
 temperature, concentration, time = best_conditions
-
-
-# -----------------------------------
-# 9. Calculate heating energy
-# -----------------------------------
 
 energy = heating_energy(
     mass,
@@ -267,18 +222,8 @@ energy = heating_energy(
     feed_temperature,
     temperature
 )
-
-
-# -----------------------------------
-# 10. Display results
-# -----------------------------------
-
-print("\n======================================")
-print("          OPTIMIZATION RESULTS")
-print("======================================")
-
+print("OPTIMIZATION RESULTS")
 print("\nOptimal Conditions")
-print("--------------------------------------")
 
 print(
     f"Temperature: {temperature} K"
@@ -297,10 +242,7 @@ print(
     f"{best_conversion * 100:.2f}%"
 )
 
-
 print("\nHeating Requirements")
-print("--------------------------------------")
-
 print(
     f"Feed Temperature: "
     f"{feed_temperature} K"
