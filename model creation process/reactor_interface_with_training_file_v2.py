@@ -5,16 +5,8 @@ import pandas as pd
 
 FEATURE_COLUMNS = ["Temperature (K)", "Concentration (M)", "Time (s)"]
 
-
-# -----------------------------------
-# 1. Load the trained AI model
-# -----------------------------------
-
 model = joblib.load("reactor_model.pkl")
 data = pd.read_csv("reaction_data.csv") # loads the ranges that the AI was trained on
-
-print("AI model loaded successfully!")
-
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -36,10 +28,8 @@ def parse_args():
 
     return parser.parse_args()
 
-
 def is_interactive():
     return sys.stdin is not None and sys.stdin.isatty()
-
 
 def get_float_input(prompt):
     if not is_interactive():
@@ -55,7 +45,6 @@ def get_float_input(prompt):
             print("\nNo input available. Run this script in a real terminal where you can type values.")
             sys.exit(1)
 
-
 def get_value(arg_value, prompt):
     if arg_value is not None:
         return arg_value
@@ -64,85 +53,38 @@ def get_value(arg_value, prompt):
 
 args = parse_args()
 
-print("\n======================================")
-print("       AI REACTOR OPTIMIZATION")
-print("======================================")
-
+print("AI REACTOR OPTIMIZATION")
 print("\nEnter the operating range for the optimizer.")
 
-
 # Temperature range
-min_temperature = get_value(
-    args.min_temperature,
-    "Minimum temperature (K): "
-)
-
-max_temperature = get_value(
-    args.max_temperature,
-    "Maximum temperature (K): "
-)
-
+min_temperature = get_value(args.min_temperature,"Minimum temperature (K): ")
+max_temperature = get_value(args.max_temperature,"Maximum temperature (K): ")
 
 # Concentration range
-min_concentration = get_value(
-    args.min_concentration,
-    "Minimum concentration (mol/L): "
-)
-
-max_concentration = get_value(
-    args.max_concentration,
-    "Maximum concentration (mol/L): "
-)
-
+min_concentration = get_value(args.min_concentration,"Minimum concentration (mol/L): ")
+max_concentration = get_value(args.max_concentration,"Maximum concentration (mol/L): ")
 
 # Residence time range
-min_time = get_value(
-    args.min_time,
-    "Minimum residence time (min): "
-)
-
-max_time = get_value(
-    args.max_time,
-    "Maximum residence time (min): "
-)
-
-
-# -----------------------------------
-# 3. Get heating parameters
-# -----------------------------------
+min_time = get_value(args.min_time,"Minimum residence time (min): ")
+max_time = get_value(args.max_time,"Maximum residence time (min): ")
 
 print("\nEnter heating parameters.")
 
-mass = get_value(
-    args.mass,
-    "Mass of material (kg): "
-)
+mass = get_value(args.mass,"Mass of material (kg): ")
+cp = get_value(args.cp,"Specific heat capacity Cp (kJ/(kg*K)): ")
+feed_temperature = get_value(args.feed_temperature,"Feed temperature (K): ")
 
-cp = get_value(
-    args.cp,
-    "Specific heat capacity Cp (kJ/(kg*K)): "
-)
-
-feed_temperature = get_value(
-    args.feed_temperature,
-    "Feed temperature (K): "
-)
-
-# loads all maximums and minimums from the data that the AI was trained on to compare with user input
 min_trained_temperature = data["Temperature (K)"].min()
-max_trained_temperature = data["Temperature"].max()
-
+max_trained_temperature = data["Temperature (K)"].max()
 min_trained_concentration = data["Concentration (M)"].min()
 max_trained_concentration = data["Concentration (M)"].max()
-
 min_trained_time = data["Time (s)"].min()
 max_trained_time = data["Time (s)"].max()
 
-#validation of user inputs
 if min_temperature > max_temperature:
     print("\nError: minimum temperature cannot exceed maximum temperature.")
     sys.exit(1)
-
+    
 if min_concentration > max_concentration:
     print("\nError: minimum concentration cannot exceed maximum concentration.")
     sys.exit(1)
@@ -162,87 +104,36 @@ if min_temperature < min_trained_temperature:
 if max_temperature > max_trained_temperature:
     print("Error: Maximum temperature is outside the training range.")
     sys.exit(1)
-# -----------------------------------
-# 4. Heating energy function
-# -----------------------------------
 
-def heating_energy(
-    mass,
-    cp,
-    feed_temperature,
-    reactor_temperature
-):
-
-    energy = mass * cp * (
-        reactor_temperature - feed_temperature
-    )
-
+def heating_energy(mass,cp,feed_temperature,reactor_temperature):
+    energy = mass * cp * (reactor_temperature - feed_temperature)
     return energy
 
-
-# -----------------------------------
-# 5. Set up optimization
-# -----------------------------------
-
-best_conversion = 0
-
-best_conditions = None
-
-
-# -----------------------------------
-# 6. Create search ranges
-# -----------------------------------
-
 temperature_step = int(args.temperature_step)
-
 concentration_step = float(args.concentration_step)
-
 time_step = int(args.time_step)
 
 
-temperature_range = range(
-    int(min_temperature),
-    int(max_temperature) + 1,
-    temperature_step
-)
+temperature_range = range(int(min_temperature),int(max_temperature) + 1,temperature_step)
 
-
-# Generate concentration values
 concentration_range = []
-
 concentration = min_concentration
-
 while concentration <= max_concentration:
-
     concentration_range.append(concentration)
-
     concentration += concentration_step
 
-
-time_range = range(
-    int(min_time),
-    int(max_time) + 1,
-    time_step
-)
+time_range = range(int(min_time),int(max_time) + 1,time_step)
 
 if len(temperature_range) == 0 or len(concentration_range) == 0 or len(time_range) == 0:
     print("\nError: one or more search ranges are empty. Check your min/max values and step sizes.")
     sys.exit(1)
 
-
-# -----------------------------------
-# 7. Search reactor conditions
-# -----------------------------------
-
 print("\nSearching reactor conditions...")
 
 for temperature in temperature_range:
-
     for concentration in concentration_range:
-
         for time in time_range:
 
-            # Ask AI for predicted conversion
             prediction = model.predict(
                 pd.DataFrame(
                     [[temperature, concentration, time]],
@@ -253,9 +144,7 @@ for temperature in temperature_range:
             # Check if this is the best result
 
             if prediction > best_conversion:
-
                 best_conversion = prediction
-
                 best_conditions = (
                     temperature,
                     concentration,
@@ -266,36 +155,11 @@ if best_conditions is None:
     print("\nError: no valid reactor conditions were found. Check your input values and search steps.")
     sys.exit(1)
 
-
-# -----------------------------------
-# 8. Get optimal conditions
-# -----------------------------------
-
 temperature, concentration, time = best_conditions
 
+energy = heating_energy(mass,cp,feed_temperature,temperature)
 
-# -----------------------------------
-# 9. Calculate heating energy
-# -----------------------------------
-
-energy = heating_energy(
-    mass,
-    cp,
-    feed_temperature,
-    temperature
-)
-
-
-# -----------------------------------
-# 10. Display results
-# -----------------------------------
-
-print("\n======================================")
-print("          OPTIMIZATION RESULTS")
-print("======================================")
-
-print("\nOptimal Conditions")
-print("--------------------------------------")
+print("OPTIMIZATION RESULTS")
 
 print(
     f"Temperature: {temperature} K"
@@ -316,7 +180,6 @@ print(
 
 
 print("\nHeating Requirements")
-print("--------------------------------------")
 
 print(
     f"Feed Temperature: "
