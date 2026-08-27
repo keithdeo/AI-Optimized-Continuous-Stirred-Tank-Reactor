@@ -3,22 +3,12 @@ import sys
 import pandas as pd
 
 
-FEATURE_COLUMNS = [
-    "Temperature (K)",
-    "Concentration (M)",
-    "Time (s)"
-]
+FEATURE_COLUMNS = ["Temperature (K)","Concentration (M)","Time (s)"]
 
-# -----------------------------------
-# 1. Load the trained AI model & RFG dataset
-# -----------------------------------
 try:
     model = joblib.load("reactor_model.pkl")
 except FileNotFoundError:
     print("Error: trained model 'reactor_model.pkl' not found.")
-    sys.exit(1)
-except Exception as e:
-    print(f"Error loading model: {e}")
     sys.exit(1)
 
 try:
@@ -26,15 +16,7 @@ try:
 except FileNotFoundError:
     print("Error: training data 'reaction_data.csv' not found.")
     sys.exit(1)
-except Exception as e:
-    print(f"Error reading training data: {e}")
-    sys.exit(1)
 
-print("AI model and training data loaded successfully!")
-
-# -----------------------------------
-# Training-data statistics (used for sensible defaults)
-# -----------------------------------
 min_trained_temperature = data["Temperature (K)"].min()
 max_trained_temperature = data["Temperature (K)"].max()
 mean_trained_temperature = data["Temperature (K)"].mean()
@@ -47,59 +29,22 @@ min_trained_time = data["Time (s)"].min()
 max_trained_time = data["Time (s)"].max()
 mean_trained_time = data["Time (s)"].mean()
 
-# -----------------------------------
-# Allowed ranges (intersection of code limits and training ranges)
-# -----------------------------------
-# Code limits
-code_min_temp = 400.0
-code_max_temp = 600.0
-code_min_conc = 2.0
-code_max_conc = 4.0
-code_min_time = 40.0
-code_max_time = 60.0
-
-allowed_min_temp = max(code_min_temp, min_trained_temperature)
-allowed_max_temp = min(code_max_temp, max_trained_temperature)
-
-allowed_min_conc = max(code_min_conc, min_trained_concentration)
-allowed_max_conc = min(code_max_conc, max_trained_concentration)
-
-allowed_min_time = max(code_min_time, min_trained_time)
-allowed_max_time = min(code_max_time, max_trained_time)
-
-# Print allowed ranges for the user
 print("\nAllowed input ranges (must be within both code and training ranges):")
-print(f" Temperature (K): {allowed_min_temp:.2f} - {allowed_max_temp:.2f}")
-print(f" Concentration (M): {allowed_min_conc:.3f} - {allowed_max_conc:.3f}")
-print(f" Time (s): {allowed_min_time:.2f} - {allowed_max_time:.2f}")
+print(f" Temperature (K): {min_trained_temperature:.2f} - {max_trained_temperature:.2f}")
+print(f" Concentration (M): {min_trained_conc:.3f} - {max_trained_conc:.3f}")
+print(f" Time (s): {min_trained_time:.2f} - {max_trained_time:.2f}")
 
-# -----------------------------------
-# 2. Interactive inputs
-# -----------------------------------
 
 # Default search step sizes (used when searching ranges)
 temperature_step = 5
 concentration_step = 0.5
 time_step = 1
 
-# -----------------------------------
-# 3. Check interactive input
-# -----------------------------------
 def is_interactive():
     return ( sys.stdin is not None and sys.stdin.isatty())
 
-# -----------------------------------
-# 4. Get numerical input
-# -----------------------------------
-def get_float_input(prompt, default=None):
-
-    # If not interactive, return default when available
+def get_float_input(prompt):
     if not is_interactive():
-
-        if default is not None:
-
-            return float(default)
-
         print(
             "\nNo input available. "
             "Run this script in a real terminal or provide defaults."
@@ -108,44 +53,20 @@ def get_float_input(prompt, default=None):
         sys.exit(1)
 
     while True:
-
         try:
-
             raw = input(prompt)
-
-            if raw.strip() == "" and default is not None:
-
-                return float(default)
-
-            return float(raw)
-
+            
         except ValueError:
-
             print("Please enter a valid number.")
-
         except EOFError:
-
-            if default is not None:
-
-                return float(default)
-
-            print(
-                "\nNo input available. Run this script in a real terminal."
-            )
-
+            print("\nNo input available. Run this script in a real terminal.")
             sys.exit(1)
 
-
-def get_value(prompt, default=None):
-    if default is None:
-        return get_float_input(prompt)
+def get_value(prompt):
 
     prompt_with_default = f"{prompt} [{default}] "
     return get_float_input(prompt_with_default, default)
 
-# -----------------------------------
-# 5. Get CURRENT reactor conditions
-# -----------------------------------
 print("\nEnter CURRENT reactor conditions.")
 print("These are the unoptimized conditions.")
 
