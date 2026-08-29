@@ -1,92 +1,69 @@
 import joblib
 import sys
 import pandas as pd
+import numpy as np
+import itertools
 
-
-FEATURE_COLUMNS = ["Temperature (K)","Concentration (M)","Time (s)"]
+FEATURE_COLUMNS = ["Temperature (K)", "Concentration (M)", "Time (s)"]
 
 try:
     model = joblib.load("reactor_model.pkl")
-except FileNotFoundError:
-    print("Error: trained model 'reactor_model.pkl' not found.")
-    sys.exit(1)
-
-try:
     data = pd.read_csv("reaction_data.csv")
-except FileNotFoundError:
-    print("Error: training data 'reaction_data.csv' not found.")
+except Exception as e:
+    print(f"Error loading files: {e}")
     sys.exit(1)
 
 min_trained_temperature = data["Temperature (K)"].min()
 max_trained_temperature = data["Temperature (K)"].max()
-mean_trained_temperature = data["Temperature (K)"].mean()
-
 min_trained_concentration = data["Concentration (M)"].min()
 max_trained_concentration = data["Concentration (M)"].max()
-mean_trained_concentration = data["Concentration (M)"].mean()
-
 min_trained_time = data["Time (s)"].min()
 max_trained_time = data["Time (s)"].max()
-mean_trained_time = data["Time (s)"].mean()
+
 
 print("\nAllowed input ranges (must be within both code and training ranges):")
-print(f" Temperature (K): {min_trained_temperature:.2f} - {max_trained_temperature:.2f}")
-print(f" Concentration (M): {min_trained_conc:.3f} - {max_trained_conc:.3f}")
-print(f" Time (s): {min_trained_time:.2f} - {max_trained_time:.2f}")
+print(f" Temperature (K): {min_trained_temperature:.2f} to {max_trained_temperature:.2f}")
+print(f" Concentration (M): {min_trained_concentration:.3f} to {max_trained_concentration:.3f}")
+print(f" Time (s): {min_trained_time:.2f} to {max_trained_time:.2f}")
 
-
-# Default search step sizes (used when searching ranges)
-temperature_step = 5
-concentration_step = 0.5
-time_step = 1
+temperature_step = 1.0  
+concentration_step = 0.1 
+time_step = 1.0 
 
 def is_interactive():
-    return ( sys.stdin is not None and sys.stdin.isatty())
+    return sys.stdin is not None and sys.stdin.isatty()
 
-def get_float_input(prompt):
+def get_float_input(prompt, default=None):
     if not is_interactive():
-        print(
-            "\nNo input available. "
-            "Run this script in a real terminal or provide defaults."
-        )
-
+        if default is not None:
+            return float(default)
+        print("\nNo input available. Run this script in a real terminal.")
         sys.exit(1)
-
     while True:
         try:
             raw = input(prompt)
-            
+            if raw.strip() == "" and default is not None:
+                return float(default)
+            return float(raw)
         except ValueError:
             print("Please enter a valid number.")
         except EOFError:
+            if default is not None:
+                return float(default)
             print("\nNo input available. Run this script in a real terminal.")
             sys.exit(1)
 
-def get_value(prompt):
-    return prompt;
+def get_value(prompt, default=None):
+    if default is None:
+        return get_float_input(prompt)
+    return get_float_input(f"{prompt} [{default}] ", default)
 
 print("\nEnter CURRENT reactor conditions.")
-print("These are the unoptimized conditions.")
+current_temperature = get_value("Current temperature (K): ", round(min_trained_temperature, 2))
+current_concentration = get_value("Current concentration (M): ", round(min_trained_concentration, 3))
+current_time = get_value("Current residence time (s): ", round(min_trained_time, 2))
 
-current_temperature = get_value(
-    "Current temperature (K): ",
-    round(mean_trained_temperature, 2)
-)
-
-
-current_concentration = get_value(
-    "Current concentration (M): ",
-    round(mean_trained_concentration, 3)
-)
-
-
-current_time = get_value(
-    "Current residence time (s): ",
-    round(mean_trained_time, 2)
-)
-
-print("\nEnter the operating range")
-print("for the optimizer.")
+print("\nEnter the operating range for the optimizer.")
 min_temperature = get_value("Minimum temperature (K): ", round(min_trained_temperature, 2))
 max_temperature = get_value("Maximum temperature (K): ", round(max_trained_temperature, 2))
 min_concentration = get_value("Minimum concentration (M): ", round(min_trained_concentration, 3))
@@ -103,383 +80,58 @@ print("\nEnter economic parameters.")
 energy_price = get_value("Energy price ($/kWh): ", 0.1)
 product_value = get_value("Product value at 100% conversion ($): ", 100.0)
 
-if min_temperature > max_temperature:
-
-    print(
-        "\nError: minimum temperature "
-        "cannot exceed maximum temperature."
-    )
-
+if min_temperature > max_temperature or min_concentration > max_concentration or min_time > max_time:
+    print("\nError: minimum values cannot exceed maximum values.")
     sys.exit(1)
 
-if min_concentration > max_concentration:
-
-    print(
-        "\nError: minimum concentration "
-        "cannot exceed maximum concentration."
-    )
-
+if min_temperature < 400 or max_temperature > 600 or min_concentration < 2 or max_concentration > 4 or min_time < 40 or max_time > 60:
+    print("\nError: Optimization bounds exceed hardcoded constraints.")
     sys.exit(1)
 
-if min_time > max_time:
-
-    print(
-        "\nError: minimum residence time "
-        "cannot exceed maximum residence time."
-    )
-
+if min_temperature < min_trained_temperature or max_temperature > max_trained_temperature or min_concentration < min_trained_concentration or max_concentration > max_trained_concentration or min_time < min_trained_time or max_time > max_trained_time:
+    print("\nError: Optimization bounds are outside the AI training range.")
     sys.exit(1)
 
+def heating_energy(mass, cp, feed_temperature, reactor_temperature):
+    return mass * cp * (reactor_temperature - feed_temperature)
 
-if min_temperature < 400:
+current_prediction = model.predict(pd.DataFrame([[current_temperature, current_concentration, current_time]], columns=FEATURE_COLUMNS))[0]
+current_energy = heating_energy(mass, cp, feed_temperature, current_temperature)
+current_heating_cost = (current_energy / 3600) * energy_price
+current_score = (current_prediction * product_value) - current_heating_cost
 
-    print(
-        "\nError: minimum temperature "
-        "must be greater than 400 K."
-    )
+print("\nSearching for highest optimization peak...")
 
+temp_vals = np.arange(min_temperature, max_temperature + temperature_step, temperature_step)
+conc_vals = np.arange(min_concentration, max_concentration + concentration_step, concentration_step)
+time_vals = np.arange(min_time, max_time + time_step, time_step)
+
+search_df = pd.DataFrame(list(itertools.product(temp_vals, conc_vals, time_vals)), columns=FEATURE_COLUMNS)
+
+if search_df.empty:
+    print("\nError: no valid reactor conditions found.")
     sys.exit(1)
 
-if max_temperature > 600:
-
-    print(
-        "\nError: maximum temperature "
-        "must be less than 600 K."
-    )
-
-    sys.exit(1)
-
-if min_concentration < 2:
-
-    print(
-        "\nError: minimum concentration "
-        "must be greater than 2 M."
-    )
-
-    sys.exit(1)
-
-if max_concentration > 4:
-
-    print(
-        "\nError: maximum concentration "
-        "must be less than 4 M."
-    )
-
-    sys.exit(1)
-
-
-if min_time < 40:
-
-    print(
-        "\nError: minimum time "
-        "must be greater than 40 s."
-    )
-
-    sys.exit(1)
-
-if max_time > 60:
-
-    print(
-        "\nError: maximum time "
-        "must be less than 60 s."
-    )
-
-    sys.exit(1)
-
-if min_temperature < min_trained_temperature:
-
-    print("\nError: minimum temperature is outside training range.")
-
-    sys.exit(1)
-
-
-if max_temperature > max_trained_temperature:
-
-    print("\nError: maximum temperature is outside training range.")
-
-    sys.exit(1)
-
-
-if min_concentration < min_trained_concentration:
-
-    print("\nError: minimum concentration is outside training range.")
-
-    sys.exit(1)
-
-
-if max_concentration > max_trained_concentration:
-
-    print("\nError: maximum concentration is outside training range.")
-
-    sys.exit(1)
-
-
-if min_time < min_trained_time:
-
-    print("\nError: minimum time is outside training range.")
-
-    sys.exit(1)
-
-
-if max_time > max_trained_time:
-
-    print("\nError: maximum time is outside training range.")
-
-    sys.exit(1)
-
-def heating_energy(mass,cp,feed_temperature,reactor_temperature):
-    return (mass * cp * (reactor_temperature - feed_temperature))
-
-
-current_time_seconds = current_time
-
-current_prediction = model.predict(
-    pd.DataFrame(
-        [[
-            current_temperature,
-            current_concentration,
-            current_time_seconds
-        ]],
-        columns=FEATURE_COLUMNS
-    )
-)[0]
-
-
-current_energy = heating_energy(
-    mass,
-    cp,
-    feed_temperature,
-    current_temperature
-)
-
-
-current_energy_kwh = (
-    current_energy / 3600
-)
-
-
-current_heating_cost = (
-    current_energy_kwh
-    * energy_price
-)
-
-
-current_conversion_value = (
-    current_prediction
-    * product_value
-)
-
-
-current_score = (
-    current_conversion_value
-    - current_heating_cost
-)
-
-temperature_range = []
-
-temperature = min_temperature
-
-while temperature <= max_temperature:
-
-    temperature_range.append(temperature)
-
-    temperature += temperature_step
-
-
-concentration_range = []
-
-concentration = min_concentration
-
-while concentration <= max_concentration:
-
-    concentration_range.append(concentration)
-
-    concentration += concentration_step
-
-
-time_range = []
-
-time = min_time
-
-while time <= max_time:
-
-    time_range.append(time)
-
-    time += time_step
-
-best_score = float("-inf")
-
-best_conversion = 0
-
-best_conditions = None
-
-best_energy = 0
-
-best_energy_cost = 0
-
-best_conversion_value = 0
-
-for temperature in temperature_range:
-
-    for concentration in concentration_range:
-
-        for time in time_range:
-
-            time_seconds = time
-
-
-            prediction = model.predict(
-                pd.DataFrame(
-                    [[
-                        temperature,
-                        concentration,
-                        time_seconds
-                    ]],
-                    columns=FEATURE_COLUMNS
-                )
-            )[0]
-
-
-            energy = heating_energy(
-                mass,
-                cp,
-                feed_temperature,
-                temperature
-            )
-
-
-            energy_kwh = (
-                energy / 3600
-            )
-
-
-            heating_cost = (
-                energy_kwh
-                * energy_price
-            )
-
-
-            conversion_value = (
-                prediction
-                * product_value
-            )
-
-
-            score = (
-                conversion_value
-                - heating_cost
-            )
-
-
-            if score > best_score:
-
-                best_score = score
-
-                best_conversion = prediction
-
-                best_conditions = (
-                    temperature,
-                    concentration,
-                    time
-                )
-
-                best_energy = energy
-
-                best_energy_cost = heating_cost
-
-                best_conversion_value = (
-                    conversion_value
-                )
-
-if best_conditions is None:
-
-    print(
-        "\nError: no valid reactor conditions found."
-    )
-
-    sys.exit(1)
-
-
-temperature, concentration, time = (
-    best_conditions
-)
-
-conversion_improvement = (
-    best_conversion
-    - current_prediction
-)
-
-
-conversion_improvement_percent = (
-    conversion_improvement
-    * 100
-)
-
-
-score_improvement = (
-    best_score
-    - current_score
-)
-
-print("REACTOR COMPARISON")
-
-print(
-    f"Temperature (K)     "
-    f"{current_temperature:10.2f}     "
-    f"{temperature:10.2f}"
-)
-
-
-print(
-    f"Concentration (M)   "
-    f"{current_concentration:10.2f}     "
-    f"{concentration:10.2f}"
-)
-
-
-print(
-    f"Time (s)           "
-    f"{current_time:10.2f}     "
-    f"{time:10.2f}"
-)
-
-
-print(
-    f"Conversion (%)       "
-    f"{current_prediction * 100:10.2f}     "
-    f"{best_conversion * 100:10.2f}"
-)
-
-
-print(
-    f"Energy (kJ)          "
-    f"{current_energy:10.2f}     "
-    f"{best_energy:10.2f}"
-)
-
-
-print(
-    f"Heating Cost ($)     "
-    f"{current_heating_cost:10.2f}     "
-    f"{best_energy_cost:10.2f}"
-)
-
-
-print(
-    f"Economic Score ($)   "
-    f"{current_score:10.2f}     "
-    f"{best_score:10.2f}"
-)
-
-print("IMPROVEMENT")
-
-print(
-    f"Conversion improvement: "
-    f"{conversion_improvement_percent:.2f} percentage points"
-)
-
-
-print(
-    f"Economic score improvement: "
-    f"${score_improvement:.2f}"
-)
+search_df['Predicted_Conversion'] = model.predict(search_df)
+search_df['Energy_Required_kJ'] = mass * cp * (search_df['Temperature (K)'] - feed_temperature)
+search_df['Heating_Cost_$'] = (search_df['Energy_Required_kJ'] / 3600) * energy_price
+search_df['Economic_Score'] = (search_df['Predicted_Conversion'] * product_value) - search_df['Heating_Cost_$']
+
+best_run = search_df.loc[search_df['Economic_Score'].idxmax()]
+
+conversion_improvement_percent = (best_run['Predicted_Conversion'] - current_prediction) * 100
+score_improvement = best_run['Economic_Score'] - current_score
+
+print("\nREACTOR COMPARISON")
+print(f"{'Metric':<25} {'CURRENT':<15} {'OPTIMIZED':<15}")
+print(f"{'Temperature (K)':<25} {current_temperature:<15.2f} {best_run['Temperature (K)']:<15.2f}")
+print(f"{'Concentration (M)':<25} {current_concentration:<15.2f} {best_run['Concentration (M)']:<15.2f}")
+print(f"{'Time (s)':<25} {current_time:<15.2f} {best_run['Time (s)']:<15.2f}")
+print(f"{'Conversion (%)':<25} {current_prediction * 100:<15.2f} {best_run['Predicted_Conversion'] * 100:<15.2f}")
+print(f"{'Energy (kJ)':<25} {current_energy:<15.2f} {best_run['Energy_Required_kJ']:<15.2f}")
+print(f"{'Heating Cost ($)':<25} {current_heating_cost:<15.2f} {best_run['Heating_Cost_$']:<15.2f}")
+print(f"{'Economic Score ($)':<25} {current_score:<15.2f} {best_run['Economic_Score']:<15.2f}")
+
+print("\nIMPROVEMENT")
+print(f"Conversion improvement: {conversion_improvement_percent:.2f} percentage points")
+print(f"Economic score improvement: ${score_improvement:.2f}\n")
