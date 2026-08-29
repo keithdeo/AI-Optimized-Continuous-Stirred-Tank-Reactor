@@ -275,11 +275,6 @@ current_score = (
     - current_heating_cost
 )
 
-
-# -----------------------------------
-# 16. Create optimization ranges
-# -----------------------------------
-
 temperature_range = []
 
 temperature = min_temperature
@@ -312,11 +307,6 @@ while time <= max_time:
 
     time += time_step
 
-
-# -----------------------------------
-# 17. Initialize optimization
-# -----------------------------------
-
 best_score = float("-inf")
 
 best_conversion = 0
@@ -328,14 +318,6 @@ best_energy = 0
 best_energy_cost = 0
 
 best_conversion_value = 0
-
-
-# -----------------------------------
-# 18. Search for optimal conditions
-# -----------------------------------
-
-print("\nSearching reactor conditions...")
-
 
 for temperature in temperature_range:
 
@@ -409,11 +391,6 @@ for temperature in temperature_range:
                     conversion_value
                 )
 
-
-# -----------------------------------
-# 19. Make sure optimization worked
-# -----------------------------------
-
 if best_conditions is None:
 
     print(
@@ -426,11 +403,6 @@ if best_conditions is None:
 temperature, concentration, time = (
     best_conditions
 )
-
-
-# -----------------------------------
-# 20. Calculate improvement
-# -----------------------------------
 
 conversion_improvement = (
     best_conversion
@@ -449,19 +421,7 @@ score_improvement = (
     - current_score
 )
 
-
-# -----------------------------------
-# 21. Display comparison
-# -----------------------------------
-
-print("\n======================================")
-print("       REACTOR COMPARISON")
-print("======================================")
-
-
-print("\n                    CURRENT       OPTIMIZED")
-print("------------------------------------------------")
-
+print("REACTOR COMPARISON")
 
 print(
     f"Temperature (K)     "
@@ -511,15 +471,7 @@ print(
     f"{best_score:10.2f}"
 )
 
-
-# -----------------------------------
-# 22. Display improvements
-# -----------------------------------
-
-print("\n======================================")
-print("             IMPROVEMENT")
-print("======================================")
-
+print("IMPROVEMENT")
 
 print(
     f"Conversion improvement: "
@@ -531,6 +483,3 @@ print(
     f"Economic score improvement: "
     f"${score_improvement:.2f}"
 )
-
-
-print("\n======================================")
